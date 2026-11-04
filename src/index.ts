@@ -18,6 +18,7 @@ import { handleStats } from "./handlers/stats";
 import { handleSessions } from "./handlers/sessions";
 import { handleExport } from "./handlers/export";
 import { handleLogtimeHistory } from "./handlers/logtime-history";
+import { handleEvaluations } from "./handlers/evaluations";
 import { ftConfigured } from "./ft-api";
 import { publicRecord } from "./public-visuals";
 import { kvRecord } from "./sessions";
@@ -69,6 +70,7 @@ const USER_ROUTES = new Set([
   "/api/v1/private/images",
   "/api/v1/private/export",
   "/api/v1/private/logtime/history",
+  "/api/v1/private/evaluations",
 ]);
 
 async function route(request: Request, env: Env): Promise<Response> {
@@ -143,13 +145,17 @@ async function route(request: Request, env: Env): Promise<Response> {
   // the extension only offers a feature that will answer.
   if (url.pathname === "/api/v1/public/features") {
     if (request.method !== "GET") return methodNotAllowedRes();
-    return jsonRes({ features: { logtimeHistory: ftConfigured(env) } }, 200, {
+    return jsonRes({ features: { logtimeHistory: ftConfigured(env), evaluations: ftConfigured(env) } }, 200, {
       "Cache-Control": "public, max-age=300",
     });
   }
 
   // Without the 42 application the route does not exist, before any read.
-  if (url.pathname === "/api/v1/private/logtime/history" && !ftConfigured(env)) {
+  if (
+    (url.pathname === "/api/v1/private/logtime/history" ||
+      url.pathname === "/api/v1/private/evaluations") &&
+    !ftConfigured(env)
+  ) {
     return notFoundRes();
   }
 
@@ -217,6 +223,10 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   if (url.pathname === "/api/v1/private/logtime/history") {
     return handleLogtimeHistory(request, env, loginParam, record);
+  }
+
+  if (url.pathname === "/api/v1/private/evaluations") {
+    return handleEvaluations(request, env, loginParam, record);
   }
 
   // USER_ROUTES leaves only /api/v1/private/calendar/update here

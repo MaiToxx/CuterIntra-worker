@@ -200,3 +200,43 @@ describe("handleGhProxy when a source throws or stalls", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 });
+
+describe("handleGhProxy revalidation (ETag)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("passes the source's validators to the client", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response("raw", {
+        status: 200,
+        headers: { "Content-Type": "application/json", ETag: 'W/"abc"', "Last-Modified": "Tue, 03 Nov 2026 10:00:00 GMT" },
+      }),
+    ) as unknown as typeof fetch;
+    const res = await handleGhProxy(new Request("https://w.test/gh/campuses/campuses.json"));
+    expect(res.headers.get("etag")).toBe('W/"abc"');
+    expect(res.headers.get("last-modified")).toBe("Tue, 03 Nov 2026 10:00:00 GMT");
+  });
+
+  it("forwards the client's validators and answers the source's 304 without a body", async () => {
+    const seen: Headers[] = [];
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push(new Headers(init?.headers));
+      return new Response(null, { status: 304, headers: { ETag: 'W/"abc"' } });
+    }) as unknown as typeof fetch;
+    const res = await handleGhProxy(
+      new Request("https://w.test/gh/campuses/campuses.json", {
+        headers: { "If-None-Match": 'W/"abc"', Cookie: "x=y" },
+      }),
+    );
+    expect(res.status).toBe(304);
+    expect(res.body).toBeNull();
+    expect(res.headers.get("etag")).toBe('W/"abc"');
+    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(res.headers.get("access-control-allow-origin")).not.toBeNull();
+    expect(seen[0].get("if-none-match")).toBe('W/"abc"');
+    // Only the validators go upstream.
+    expect(seen[0].get("cookie")).toBeNull();
+    expect(seen).toHaveLength(1);
+  });
+});

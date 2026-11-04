@@ -135,9 +135,9 @@ describe("GET /api/v1/private/logtime/history", () => {
 describe("GET /api/v1/public/features", () => {
   it("says whether the logtime history is available", async () => {
     const off = await worker.fetch(new Request("https://w.test/api/v1/public/features"), makeEnv().env);
-    expect(await off.json()).toEqual({ features: { logtimeHistory: false } });
+    expect(await off.json()).toEqual({ features: { logtimeHistory: false, evaluations: false } });
     const on = await worker.fetch(new Request("https://w.test/api/v1/public/features"), makeEnv({ vars: APP }).env);
-    expect(await on.json()).toEqual({ features: { logtimeHistory: true } });
+    expect(await on.json()).toEqual({ features: { logtimeHistory: true, evaluations: true } });
     expect(on.headers.get("Cache-Control")).toBe("public, max-age=300");
   });
 });

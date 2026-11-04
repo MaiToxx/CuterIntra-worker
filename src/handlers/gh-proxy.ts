@@ -1,8 +1,8 @@
 import { corsHeaders, errorRes, FETCH_DEADLINES } from "../utils";
 
 const SOURCES = [
-  "https://raw.githubusercontent.com/MaiToxx/BetterIntraRemake/main",
-  "https://cdn.jsdelivr.net/gh/MaiToxx/BetterIntraRemake@main",
+  "https://raw.githubusercontent.com/MaiToxx/CuterIntra/main",
+  "https://cdn.jsdelivr.net/gh/MaiToxx/CuterIntra@main",
 ];
 
 const CONTENT_TYPES: Record<string, string> = {

@@ -19,7 +19,7 @@ import { FETCH_DEADLINES } from "./utils";
  */
 
 export const FT_API = "https://api.intra.42.fr";
-const USER_AGENT = "CuterIntra-worker (+https://github.com/MaiToxx/BetterIntraRemake)";
+const USER_AGENT = "CuterIntra-worker (+https://github.com/MaiToxx/CuterIntra)";
 /** One request every 550 ms per isolate stays under 2 a second. */
 const GAP_MS = 550;
 /** A token is renewed this long before 42 says it expires. */

@@ -110,7 +110,7 @@ export async function handleExport(
     200,
     {
       "Cache-Control": "no-store",
-      "Content-Disposition": 'attachment; filename="better-intra-cloud-data.json"',
+      "Content-Disposition": 'attachment; filename="cuter-intra-cloud-data.json"',
     },
   );
 }

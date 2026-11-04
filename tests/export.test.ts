@@ -70,7 +70,7 @@ describe("GET /api/v1/private/export", () => {
     expect(res.headers.get("Content-Type")).toBe("application/json");
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("Content-Disposition")).toBe(
-      'attachment; filename="better-intra-cloud-data.json"',
+      'attachment; filename="cuter-intra-cloud-data.json"',
     );
     const body = (await res.json()) as Record<string, any>;
     const publicBody = await (

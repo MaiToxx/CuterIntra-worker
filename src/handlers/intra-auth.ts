@@ -5,7 +5,7 @@
  * (realm "students-42" on auth.42.fr). The extension already sees that token
  * on every Intra page. This endpoint verifies the token's RS256 signature
  * against Keycloak's public keys (JWKS), checks issuer and expiry, and opens a
- * Better Intra session for the login carried by the token, exactly like the
+ * Cuter Intra session for the login carried by the token, exactly like the
  * OAuth callback does, minus the 42 API tokens (features that call the 42
  * API server-side stay unavailable on such sessions). The session lives in D1
  * (src/sessions.ts); the KV record is only written by a first sign-in.
@@ -205,7 +205,7 @@ export async function verifyIntraJwt(
 /**
  * Under a deadline, body included: a stalled auth.42.fr used to hold the
  * sign-in until the extension's 20 s timeout, which it reads as "could not
- * reach the Better Intra server, check the site permission". A throw here is
+ * reach the Cuter Intra server, check the site permission". A throw here is
  * the 503 every build reads as "42's key server did not answer".
  */
 async function fetchJwks(): Promise<Jwk[]> {

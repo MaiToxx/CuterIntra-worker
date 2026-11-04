@@ -1,6 +1,6 @@
-# Better Intra Worker
+# Cuter Intra Worker
 
-Backend 'cloud' worker for the Better Intra extension, managing user synchronization and persistence via Cloudflare KV and D1.
+Backend 'cloud' worker for the Cuter Intra extension, managing user synchronization and persistence via Cloudflare KV and D1.
 Deployed with `npm run deploy` (see [Deploy and roll back](#deploy-and-roll-back); this repository has no CI workflow).
 
 This deployment serves the **Intra-login build** of the extension: no 42 OAuth application, no Discord bot, no R2 bucket. Everything that needed one of those in the upstream worker (42 OAuth `/login` and `/callback`, evaluation reminders and their crons, Discord linking, image hosting, the students directory, logtime history, the 42 API proxy, project refresh) has been removed rather than left answering errors. `wrangler.json` declares `"crons": []` on purpose: the empty array is what makes `wrangler deploy` delete the schedules still registered on the live worker.

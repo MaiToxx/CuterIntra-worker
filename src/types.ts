@@ -17,6 +17,13 @@ export interface Env {
    * value is undone by editing the variable (see src/handlers/intra-auth.ts).
    */
   JWT_ALLOWED_AZP?: string;
+  /**
+   * The deployment's 42 API application (src/ft-api.ts), both set with
+   * `npx wrangler secret put`. Missing: the routes that need the 42 API answer
+   * 404. The secret changes about every 30 days on 42's side.
+   */
+  FT_CLIENT_ID?: string;
+  FT_CLIENT_SECRET?: string;
 }
 
 export type UserData = {

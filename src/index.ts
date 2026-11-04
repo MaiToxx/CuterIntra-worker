@@ -17,12 +17,15 @@ import { handleAnnouncement } from "./handlers/announcement";
 import { handleStats } from "./handlers/stats";
 import { handleSessions } from "./handlers/sessions";
 import { handleExport } from "./handlers/export";
+import { handleLogtimeHistory } from "./handlers/logtime-history";
+import { ftConfigured } from "./ft-api";
 import { publicRecord } from "./public-visuals";
 import { kvRecord } from "./sessions";
 import { Env } from "./types";
 import {
   errorRes,
   getBearerToken,
+  jsonRes,
   isLoginHash,
   isOriginAllowed,
   methodNotAllowedRes,
@@ -32,12 +35,13 @@ import {
 } from "./utils";
 
 /**
- * This worker serves the Intra-login build of the extension: no 42 OAuth
- * application, no Discord, no R2. Every route that needed one of those (42
- * OAuth login, evaluation reminders and their crons, Discord, image hosting,
- * the students directory, logtime history, the 42 API proxy...) is gone
- * rather than answering errors: the routes below are exactly the ones the
- * extension calls (grep WORKER_URL in its src/).
+ * This worker serves the Intra-login build of the extension: sign-in with the
+ * Intra session, no 42 OAuth login, no Discord, no R2. Upstream's routes that
+ * needed those (OAuth login, evaluation reminders and their crons, Discord,
+ * the students directory, the 42 API proxy...) are gone rather than answering
+ * errors. The deployment's own 42 application, when configured (src/ft-api.ts),
+ * serves read-only additions such as your logtime history; without it they
+ * answer 404 as before.
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -64,6 +68,7 @@ const USER_ROUTES = new Set([
   "/api/v1/private/calendar/update",
   "/api/v1/private/images",
   "/api/v1/private/export",
+  "/api/v1/private/logtime/history",
 ]);
 
 async function route(request: Request, env: Env): Promise<Response> {
@@ -134,6 +139,20 @@ async function route(request: Request, env: Env): Promise<Response> {
     return handleStats(request, env);
   }
 
+  // What this deployment can do beyond the routes every build relies on, so
+  // the extension only offers a feature that will answer.
+  if (url.pathname === "/api/v1/public/features") {
+    if (request.method !== "GET") return methodNotAllowedRes();
+    return jsonRes({ features: { logtimeHistory: ftConfigured(env) } }, 200, {
+      "Cache-Control": "public, max-age=300",
+    });
+  }
+
+  // Without the 42 application the route does not exist, before any read.
+  if (url.pathname === "/api/v1/private/logtime/history" && !ftConfigured(env)) {
+    return notFoundRes();
+  }
+
   const loginsParam = url.searchParams.get("logins");
   if (url.pathname === "/api/v1/public/visuals" && loginsParam !== null) {
     return handlePublicVisualsBatch(request, env, loginsParam);
@@ -194,6 +213,10 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   if (url.pathname === "/api/v1/private/export") {
     return handleExport(request, env, loginParam, record);
+  }
+
+  if (url.pathname === "/api/v1/private/logtime/history") {
+    return handleLogtimeHistory(request, env, loginParam, record);
   }
 
   // USER_ROUTES leaves only /api/v1/private/calendar/update here

@@ -137,7 +137,7 @@ export const kvBusyRes = () =>
   });
 
 /** Env keys whose values must never appear in a response body. */
-const SECRET_ENV_KEYS = ["ANNOUNCEMENT_SECRET"] as const;
+const SECRET_ENV_KEYS = ["ANNOUNCEMENT_SECRET", "FT_CLIENT_SECRET"] as const;
 
 /**
  * Answer for an exception nothing else caught. Without it the runtime serves
@@ -219,6 +219,8 @@ export const FETCH_DEADLINES = {
   clusterSvgMs: 8_000,
   /** Subject PDF, up to 16 MB, redirects included (workerFetch waits 10 s). */
   subjectPdfMs: 8_000,
+  /** One 42 API call, token included in its own (src/ft-api.ts). */
+  ftApiMs: 4_000,
 };
 
 /**

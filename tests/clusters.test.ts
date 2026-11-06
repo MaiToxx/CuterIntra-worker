@@ -66,6 +66,7 @@ describe("handleClusterSvg", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
       "https://meta.intra.42.fr",
     );
+    expect(res.headers.get("Vary")).toBe("Origin");
     expect(res.headers.get("Content-Security-Policy")).toContain("sandbox");
     expect(res.headers.get("Content-Security-Policy")).toContain(
       "default-src 'none'",

@@ -2,6 +2,7 @@
 export declare const DATABASE: string;
 export declare const APPLIED_MIGRATIONS_QUERY: string;
 export declare const MAX_MESSAGE_LENGTH: number;
+export declare const LIVE_READ_ATTEMPTS: number;
 
 export type Tool = "git" | "vitest" | "tsc" | "wrangler";
 export interface RunResult {
@@ -20,4 +21,6 @@ export declare function deploy(options: {
   dryRun?: boolean;
   log?: (line: string) => void;
   error?: (line: string) => void;
+  /** Waits between two reads of the live migrations (tests pass a no-op). */
+  pause?: (ms: number) => void;
 }): number;

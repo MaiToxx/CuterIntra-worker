@@ -47,7 +47,14 @@ function fakeRun(
   const lines: string[] = [];
   const errors: string[] = [];
   const go = (dryRun = false) =>
-    deploy({ run, migrations: LOCAL, dryRun, log: (l) => lines.push(l), error: (l) => errors.push(l) });
+    deploy({
+      run,
+      migrations: LOCAL,
+      dryRun,
+      log: (l) => lines.push(l),
+      error: (l) => errors.push(l),
+      pause: () => {},
+    });
   return { run, calls, lines, errors, go };
 }
 
@@ -122,6 +129,27 @@ describe("scripts/deploy.mjs", () => {
     expect(go()).toBe(1);
     expect(deployCall(calls)).toBeUndefined();
     expect(errors.join("\n")).toContain("You are not authenticated.");
+  });
+
+  it("reads the live migrations a second time when the first read fails, then deploys", () => {
+    let reads = 0;
+    const { calls, lines, go } = fakeRun(undefined, (tool, args) => {
+      if (tool === "wrangler" && args[0] === "d1" && ++reads === 1) {
+        return { status: 1, stdout: "", stderr: "A request to the Cloudflare API failed." };
+      }
+      return undefined;
+    });
+    expect(go()).toBe(0);
+    expect(reads).toBe(2);
+    expect(lines.join("\n")).toContain("trying again");
+    expect(deployCall(calls)).toBeDefined();
+  });
+
+  it("gives up after the second failed read", () => {
+    const { calls, go } = fakeRun({ status: 1, stdout: "", stderr: "down" });
+    expect(go()).toBe(1);
+    expect(calls.filter((c) => c.tool === "wrangler" && c.args[0] === "d1")).toHaveLength(2);
+    expect(deployCall(calls)).toBeUndefined();
   });
 
   it("passes a failed deploy's exit code on", () => {

@@ -74,6 +74,9 @@ export async function handleClusterSvg(
     headers: {
       "Content-Type": "image/svg+xml",
       "Access-Control-Allow-Origin": origin || "*",
+      // The allowed origin is the caller's: a shared cache must not hand one
+      // extension's copy to another origin, whose CORS check would fail.
+      Vary: "Origin",
       "Cache-Control": "public, max-age=604800",
       // The extension reads the body with fetch(), where these headers change
       // nothing. They matter when the URL is opened as a page: an SVG

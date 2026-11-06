@@ -76,7 +76,28 @@ export function versionMessage(sha, subject) {
  * stderr}; `capture` false streams the output to the terminal). Returns the
  * exit code.
  */
-export function deploy({ run, migrations, dryRun = false, log = console.log, error = console.error }) {
+/** Blocks for `ms` (the script is synchronous: spawnSync all the way). */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Tries to read the live migrations this many times. The Cloudflare API
+ * answered "A request to the Cloudflare API (.../d1/database/.../query)
+ * failed" on the first try of two deploys in a row (2026-11-04), and the
+ * second try passed both times.
+ */
+export const LIVE_READ_ATTEMPTS = 2;
+const LIVE_READ_PAUSE_MS = 3000;
+
+export function deploy({
+  run,
+  migrations,
+  dryRun = false,
+  log = console.log,
+  error = console.error,
+  pause = sleepSync,
+}) {
   const git = (...args) => run("git", args, { capture: true });
 
   const tree = git("status", "--porcelain");
@@ -110,18 +131,27 @@ export function deploy({ run, migrations, dryRun = false, log = console.log, err
     log("> live D1 migrations: not checked in a dry run");
   } else {
     log("> live D1 migrations");
-    const query = run(
-      "wrangler",
-      ["d1", "execute", DATABASE, "--remote", "--json", "--command", APPLIED_MIGRATIONS_QUERY],
-      { capture: true },
-    );
     let applied;
-    try {
-      applied = parseAppliedMigrations(query.stdout, query.status);
-    } catch (e) {
-      error(`Refusing to deploy: ${e instanceof Error ? e.message : e}`);
-      if (query.stderr.trim()) error(query.stderr.trim());
-      return 1;
+    for (let attempt = 1; ; attempt++) {
+      const query = run(
+        "wrangler",
+        ["d1", "execute", DATABASE, "--remote", "--json", "--command", APPLIED_MIGRATIONS_QUERY],
+        { capture: true },
+      );
+      try {
+        applied = parseAppliedMigrations(query.stdout, query.status);
+        break;
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e);
+        if (attempt < LIVE_READ_ATTEMPTS) {
+          log(`  could not read them (${reason.slice(0, 120)}), trying again`);
+          pause(LIVE_READ_PAUSE_MS);
+          continue;
+        }
+        error(`Refusing to deploy: ${reason}`);
+        if (query.stderr.trim()) error(query.stderr.trim());
+        return 1;
+      }
     }
     const pending = pendingMigrations(migrations, applied);
     if (pending.length > 0) {

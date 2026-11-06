@@ -5,7 +5,7 @@ import { rateLimited, tooManyRes } from "../rate-limit";
 import { errorRes, hashLogin, jsonRes, methodNotAllowedRes, unauthorizedRes } from "../utils";
 
 /**
- * GET /api/v1/private/evaluations?login=<hash>&user=<login>&part=stats|upcoming
+ * GET /api/v1/private/evaluations?login=<hash>&user=<login>&part=stats|upcoming|points
  *
  * Your own evaluations, read with the worker's 42 application (no user token):
  *
@@ -20,10 +20,14 @@ import { errorRes, hashLogin, jsonRes, methodNotAllowedRes, unauthorizedRes } fr
  *   "corrector"|"corrected", "project": <name>|null}]}: your booked
  *   evaluations of the next 14 days, for the calendar feed's reminders. No
  *   other student's login is returned: the feed is stored on this worker.
+ * - part=points → {"points": [{"at": <ISO>, "total": n}]}: your correction
+ *   point balance after each change, oldest first, from
+ *   /correction_point_historics (the last 1,000 changes at most), for the
+ *   dashboard's graph. Reasons are left out: the graph only needs the curve.
  *
  * Your own data only, as for the logtime history: `user` must hash to the
  * session's login (42's terms, article 6; and the shared quota). Answers are
- * kept in isolate memory, stats an hour and upcoming ten minutes; nothing is
+ * kept in isolate memory, stats and points an hour, upcoming ten minutes; nothing is
  * written to KV or D1.
  */
 
@@ -46,6 +50,10 @@ export interface StatsPart {
   stats: EvalStats;
   outstanding: { received: number; given: number };
 }
+export interface PointsEntry {
+  at: string;
+  total: number;
+}
 export interface UpcomingEvaluation {
   id: number;
   beginAt: string;
@@ -56,6 +64,7 @@ export interface UpcomingEvaluation {
 
 const statsCache = new Map<string, { at: number; value: StatsPart }>();
 const upcomingCache = new Map<string, { at: number; value: UpcomingEvaluation[] }>();
+const pointsCache = new Map<string, { at: number; value: PointsEntry[] }>();
 /** Project id → name: names do not change, and one costs a request. */
 const projectNames = new Map<number, string>();
 
@@ -63,6 +72,7 @@ const projectNames = new Map<number, string>();
 export function resetEvaluationsCache(): void {
   statsCache.clear();
   upcomingCache.clear();
+  pointsCache.clear();
   projectNames.clear();
 }
 
@@ -152,6 +162,30 @@ async function readStats(env: Env, user: string): Promise<StatsPart | Response> 
   };
 }
 
+/**
+ * Your balance after each change, oldest first. Newest pages first, so a long
+ * history keeps its recent end: the graph needs that part most.
+ */
+async function readPoints(env: Env, user: string): Promise<PointsEntry[] | Response> {
+  const out: PointsEntry[] = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await ftGet(
+      env,
+      `/v2/users/${encodeURIComponent(user)}/correction_point_historics?sort=-created_at&page[size]=${PAGE_SIZE}&page[number]=${page}`,
+    );
+    if (!res.ok) return failure(res);
+    const batch = Array.isArray(res.data) ? res.data : [];
+    for (const h of batch as { created_at?: unknown; total?: unknown }[]) {
+      if (!h || typeof h.created_at !== "string" || typeof h.total !== "number") continue;
+      const at = Date.parse(h.created_at);
+      if (!Number.isFinite(at)) continue;
+      out.push({ at: new Date(at).toISOString(), total: h.total });
+    }
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return out.reverse();
+}
+
 async function projectName(env: Env, id: number): Promise<string | null> {
   const known = projectNames.get(id);
   if (known !== undefined) return known;
@@ -218,8 +252,8 @@ export async function handleEvaluations(
     return errorRes("bad_request", "Invalid user", 400);
   }
   const part = params.get("part");
-  if (part !== "stats" && part !== "upcoming") {
-    return errorRes("bad_request", "part must be stats or upcoming", 400);
+  if (part !== "stats" && part !== "upcoming" && part !== "points") {
+    return errorRes("bad_request", "part must be stats, upcoming or points", 400);
   }
   if ((await hashLogin(user)) !== loginParam) {
     return errorRes("unauthorized", "Only your own evaluations are available", 403);
@@ -233,6 +267,16 @@ export async function handleEvaluations(
     if (value instanceof Response) return value;
     remember(statsCache, loginParam, value);
     return jsonRes(value);
+  }
+
+  if (part === "points") {
+    const hit = pointsCache.get(loginParam);
+    if (hit && Date.now() - hit.at < STATS_CACHE_MS) return jsonRes({ points: hit.value });
+    if (await rateLimited(env, "write", loginParam)) return tooManyRes();
+    const value = await readPoints(env, user);
+    if (value instanceof Response) return value;
+    remember(pointsCache, loginParam, value);
+    return jsonRes({ points: value });
   }
 
   const hit = upcomingCache.get(loginParam);

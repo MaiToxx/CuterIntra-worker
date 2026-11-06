@@ -84,7 +84,7 @@ describe("GET /api/v1/private/evaluations", () => {
   it("is announced by /features", async () => {
     const { env } = signedIn();
     const res = await worker.fetch(new Request("https://w.test/api/v1/public/features"), env as never);
-    expect(await res.json()).toEqual({ features: { logtimeHistory: true, evaluations: true } });
+    expect(await res.json()).toEqual({ features: { logtimeHistory: true, evaluations: true, correctionPoints: true, coalitions: true } });
   });
 
   it("answers stats and outstanding counts from as_corrector and as_corrected", async () => {
@@ -150,6 +150,38 @@ describe("GET /api/v1/private/evaluations", () => {
       /\/v2\/users\/alepayen\/scale_teams\?range\[begin_at\]=[^,]+,[^&]+&page\[size\]=100$/,
     );
     // The project name is asked once.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("answers the correction point balance oldest first, without the reasons", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: 1000 - i,
+      reason: "Earning after defense",
+      sum: 1,
+      total: 200 - i,
+      created_at: new Date(Date.UTC(2026, 9, 1) - i * 3_600_000).toISOString(),
+    }));
+    fetchMock
+      .mockResolvedValueOnce(tokenRes())
+      .mockResolvedValueOnce(json(page1))
+      .mockResolvedValueOnce(
+        json([
+          { id: 1, reason: "Defense plannification", sum: -1, total: 3, created_at: "2026-09-01T10:00:00.000Z" },
+          { id: 2, total: "bad", created_at: "2026-09-01T09:00:00.000Z" },
+        ]),
+      );
+    const { env } = signedIn();
+    const res = await evaluations(env, "points");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { points: { at: string; total: number }[] };
+    expect(body.points).toHaveLength(101);
+    expect(body.points[0]).toEqual({ at: "2026-09-01T10:00:00.000Z", total: 3 });
+    expect(body.points[100]).toEqual({ at: "2026-10-01T00:00:00.000Z", total: 200 });
+    expect(JSON.stringify(body)).not.toContain("reason");
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      `https://api.intra.42.fr/v2/users/${USER}/correction_point_historics?sort=-created_at&page[size]=100&page[number]=1`,
+    );
+    await evaluations(env, "points");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

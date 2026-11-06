@@ -418,6 +418,7 @@ describe("removed routes", () => {
     [`/api/v1/private/friends/data?login=${LOGIN}&logins=a`, { headers: auth }],
     [`/api/v1/private/profile-stats?login=${LOGIN}&target=x`, { headers: auth }],
     [`/api/v1/private/evaluations?login=${LOGIN}`, { headers: auth }],
+    [`/api/v1/private/coalitions?login=${LOGIN}`, { headers: auth }],
     [`/api/v1/private/outstanding?login=${LOGIN}`, { headers: auth }],
     [`/api/v1/private/proxy?login=${LOGIN}&path=/v2/me`, { headers: auth }],
     ["/api/v1/private/projects/refresh", { method: "POST", body: "{}" }],
